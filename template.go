@@ -2,74 +2,86 @@ package grender
 
 import (
 	"bufio"
+	"fmt"
 	"html/template"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 var extendsRegex *regexp.Regexp
 
 func init() {
 	var err error
-	extendsRegex, err = regexp.Compile(`{{\/\*\s+extends\s+"(.*)"\s+\*\/}}`)
+	extendsRegex, err = regexp.Compile(`\{\{\/\* *?extends +?"(.+?)" *?\*\/\}\}`)
 	if err != nil {
 		panic(err)
 	}
 }
 
-func (r *Grender) compileTemplatesFromDir() {
-	if r.Options.TemplatesGlob == "" {
-		return
-	}
+func ParseDir(r string) map[string]*template.Template {
+	templateSet := map[string]*template.Template{}
+	set := template.New("")
 
 	// replace existing templates.
 	// NOTE: this is unsafe, but Debug should really not be true in production environments.
-	templateSet := make(map[string]*template.Template)
+	err := filepath.Walk(r, func(path string, info os.FileInfo, err error) error {
+		// skip dirs as they can never be valid templates
+		if info == nil || info.IsDir() {
+			return nil
+		}
 
-	files, err := filepath.Glob(r.Options.TemplatesGlob)
+		// TODO make this configurable
+		ext := filepath.Ext(path)
+		if ext != ".html" && ext != ".tmpl" {
+			return nil
+		}
+
+		fmt.Printf("\n")
+		fmt.Printf("Processing %s\n", path)
+
+		// get template name: root/users/detail.html => users/detail.html
+		name := strings.TrimPrefix(path, r)
+		layout := getLayoutForTemplate(path)
+		tmpl := template.New(name)
+
+		//tmpl := template.Must(baseTmpl.Clone()).New(name)
+
+		templateFiles := []string{path}
+
+		if layout != "" {
+			layoutFile := filepath.Join(filepath.Dir(path), layout)
+			templateFiles = append(templateFiles, layoutFile)
+			// todo: keep looking for template files
+		}
+
+		fmt.Printf("Templates for %s: %#v\n", name, templateFiles)
+
+		// parse templates in reverse order
+		// this is important because we need templates defined in child files to override templates defined in parent files
+		//for i, j := 0, len(templateFiles); i < j; i, j = i+1, j-1 {
+		//for j := len(templateFiles) - 1; j >= 0; j-- {
+		for j, _ := range templateFiles {
+			fmt.Printf("Parsing %s\n", templateFiles[j])
+			b, _ := ioutil.ReadFile(templateFiles[j])
+			tmpl.Parse(string(b))
+		}
+
+		//tmpl = template.Must(tmpl.ParseFiles(templateFiles...))
+		fmt.Printf("Template for %s: %#v\n", path, tmpl.DefinedTemplates())
+
+		templateSet[name] = tmpl
+		return nil
+	})
 	if err != nil {
-		panic(err)
+		// TODO: Handle error
 	}
 
-	baseTmpl := template.New("").Funcs(r.Options.Funcs)
+	fmt.Printf("%#v", set)
 
-	// parse partials (glob)
-	if r.Options.PartialsGlob != "" {
-		baseTmpl = template.Must(baseTmpl.ParseGlob(r.Options.PartialsGlob))
-	}
-
-	for _, templateFile := range files {
-		fileName := filepath.Base(templateFile)
-		layout := getLayoutForTemplate(templateFile)
-
-		// set template name
-		name := fileName
-		if layout != "" {
-			name = filepath.Base(layout)
-		}
-
-		tmpl := template.Must(baseTmpl.Clone())
-		tmpl = tmpl.New(name)
-
-		// parse master template
-		if layout != "" {
-			layoutFile := filepath.Join(filepath.Dir(templateFile), layout)
-			tmpl = template.Must(tmpl.ParseFiles(layoutFile))
-		}
-
-		// parse child template
-		tmpl = template.Must(tmpl.ParseFiles(templateFile))
-
-		templateSet[fileName] = tmpl
-	}
-
-	r.Templates.set = templateSet
-}
-
-// Lookup returns the compiled template by its filename or nil if there is no such template
-func (t *templates) Lookup(name string) *template.Template {
-	return t.set[name]
+	return templateSet
 }
 
 // getLayoutForTemplate scans the first line of the template file for the extends keyword
