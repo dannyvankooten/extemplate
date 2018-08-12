@@ -22,6 +22,7 @@ func init() {
 
 type templatefile struct {
 	file    string
+	name    string
 	extends string
 }
 
@@ -44,8 +45,8 @@ func ParseDir(r string) map[string]*template.Template {
 		}
 
 		layout := getLayoutForTemplate(path)
-
-		files = append(files, &templatefile{path, layout})
+		name := strings.TrimPrefix(path, r)
+		files = append(files, &templatefile{path, name, layout})
 		return nil
 	})
 
@@ -62,16 +63,14 @@ func ParseDir(r string) map[string]*template.Template {
 		if err != nil {
 			// TODO: handle error
 		}
-		sharedTemplates.Parse(string(b))
+		sharedTemplates.New(f.name).Parse(string(b))
 	}
 
-	var b []byte
-
 	// then, parse all templates again but with inheritance
+	var b []byte
 	for _, f := range files {
 		// get template name: root/users/detail.html => users/detail.html
-		name := strings.TrimPrefix(f.file, r)
-		tmpl := template.Must(sharedTemplates.Clone()).New(name)
+		tmpl := template.Must(sharedTemplates.Clone()).New(f.name)
 
 		// TODO: allow multi-leveled extending
 
@@ -87,7 +86,7 @@ func ParseDir(r string) map[string]*template.Template {
 		tmpl.Parse(string(b))
 
 		// add to set under normalized name (path from root)
-		set[name] = tmpl
+		set[f.name] = tmpl
 	}
 
 	return set

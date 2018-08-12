@@ -1,6 +1,6 @@
 {{/* extends "master.tmpl" */}}
 
 {{define "content" -}}
-from child-with-partial.tmpl
-{{template "question" .}}
+	from child-with-partial.tmpl
+	{{template "partials/question.tmpl" .}}
 {{end}}

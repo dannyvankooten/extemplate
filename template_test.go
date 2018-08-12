@@ -14,7 +14,7 @@ func TestTemplate(t *testing.T) {
 		"subdir/hello.tmpl":       "Hello from subdir/hello.tmpl", // normal template, no inheritance
 		"child.tmpl":              "Hello from child.tmpl",        // template with inheritance
 		"master.tmpl":             "Hello from master.tmpl",       // normal template with {{ block }}
-		"child-with-partial.tmpl": "Hello from child-with-partial.tmpl\nHello from partials/question.tmpl",
+		"child-with-partial.tmpl": "Hello from child-with-partial.tmpl\n\tHello from partials/question.tmpl",
 	}
 
 	for k, v := range tests {
