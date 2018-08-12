@@ -12,6 +12,31 @@ import (
 
 var extendsRegex *regexp.Regexp
 
+type Extemplate struct {
+	set map[string]*template.Template
+}
+
+func New() *Extemplate {
+	return &Extemplate{
+		set: make(map[string]*template.Template),
+	}
+}
+
+func (x *Extemplate) Delims(left, right string) *Extemplate {
+	// TODO: Fill this func
+	return x
+}
+
+func (x *Extemplate) Funcs(funcMap template.FuncMap) *Extemplate {
+	// TODO: this func
+	return x
+}
+
+func (x *Extemplate) Lookup(name string) *template.Template {
+	// TODO this func
+	return nil
+}
+
 func init() {
 	var err error
 	extendsRegex, err = regexp.Compile(`\{\{\/\* *?extends +?"(.+?)" *?\*\/\}\}`)
