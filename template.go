@@ -20,10 +20,15 @@ func init() {
 	}
 }
 
+type templatefile struct {
+	file    string
+	extends string
+}
+
 func ParseDir(r string) map[string]*template.Template {
-	templateSet := map[string]*template.Template{}
-	all := template.New("")
-	files := []string{}
+	set := map[string]*template.Template{}
+	sharedTemplates := template.New("")
+	files := make([]*templatefile, 0)
 
 	// find all template files
 	err := filepath.Walk(r, func(path string, info os.FileInfo, err error) error {
@@ -38,7 +43,9 @@ func ParseDir(r string) map[string]*template.Template {
 			return nil
 		}
 
-		files = append(files, path)
+		layout := getLayoutForTemplate(path)
+
+		files = append(files, &templatefile{path, layout})
 		return nil
 	})
 
@@ -48,42 +55,42 @@ func ParseDir(r string) map[string]*template.Template {
 
 	// parse all templates into a single template (without inheritance)
 	for _, f := range files {
-		b, err := ioutil.ReadFile(f)
+		if f.extends != "" {
+			continue
+		}
+		b, err := ioutil.ReadFile(f.file)
 		if err != nil {
 			// TODO: handle error
 		}
-		all.Parse(string(b))
+		sharedTemplates.Parse(string(b))
 	}
+
+	var b []byte
 
 	// then, parse all templates again but with inheritance
-	for _, path := range files {
+	for _, f := range files {
 		// get template name: root/users/detail.html => users/detail.html
-		name := strings.TrimPrefix(path, r)
-		layout := getLayoutForTemplate(path)
-		//tmpl := template.New(name)
-		tmpl := template.Must(all.Clone()).New(name)
-		//tmpl := template.Must(baseTmpl.Clone()).New(name)
+		name := strings.TrimPrefix(f.file, r)
+		tmpl := template.Must(sharedTemplates.Clone()).New(name)
 
-		templateFiles := []string{path}
+		// TODO: allow multi-leveled extending
 
-		if layout != "" {
-			layoutFile := filepath.Join(filepath.Dir(path), layout)
-			templateFiles = append(templateFiles, layoutFile)
-			// todo: keep looking for layout files
+		// parse layout file first, because we want child template to override defined templates
+		if f.extends != "" {
+			layoutFile := filepath.Join(r, f.extends)
+			b, _ = ioutil.ReadFile(layoutFile)
+			tmpl.Parse(string(b)) // TODO: check err
 		}
 
-		// parse templates in reverse order
-		// this is important because we need templates defined in child files to override templates defined in parent files
-		for j := len(templateFiles) - 1; j >= 0; j-- {
-			//for j, _ := range templateFiles {
-			b, _ := ioutil.ReadFile(templateFiles[j])
-			tmpl.Parse(string(b))
-		}
+		// then, parse child-template
+		b, _ = ioutil.ReadFile(f.file)
+		tmpl.Parse(string(b))
 
-		templateSet[name] = tmpl
+		// add to set under normalized name (path from root)
+		set[name] = tmpl
 	}
 
-	return templateSet
+	return set
 }
 
 // getLayoutForTemplate scans the first line of the template file for the extends keyword

@@ -6,18 +6,15 @@ import (
 	"testing"
 )
 
-func TestParseDir(t *testing.T) {
-	ParseDir("examples/")
-}
-
 func TestTemplate(t *testing.T) {
 	tmpl := ParseDir("examples/")
 
 	tests := map[string]string{
-		"hello.tmpl":              "Hello !",                               // normal template, no inheritance
-		"child.tmpl":              "Hello world from the master template.", // template with inheritance
-		"master.tmpl":             "Bye world from the master template.",   // normal template with {{ block }}
-		"child-with-partial.tmpl": "Hello world! How are we today? from the master template.",
+		"hello.tmpl":              "Hello from hello.tmpl",        // normal template, no inheritance
+		"subdir/hello.tmpl":       "Hello from subdir/hello.tmpl", // normal template, no inheritance
+		"child.tmpl":              "Hello from child.tmpl",        // template with inheritance
+		"master.tmpl":             "Hello from master.tmpl",       // normal template with {{ block }}
+		"child-with-partial.tmpl": "Hello from child-with-partial.tmpl\nHello from partials/question.tmpl",
 	}
 
 	for k, v := range tests {

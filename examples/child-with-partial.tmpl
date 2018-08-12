@@ -1,3 +1,6 @@
 {{/* extends "master.tmpl" */}}
 
-{{define "content"}}Hello world! {{template "question" .}}{{end}}
+{{define "content" -}}
+from child-with-partial.tmpl
+{{template "question" .}}
+{{end}}
