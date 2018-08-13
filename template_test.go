@@ -51,6 +51,7 @@ func TestTemplates(t *testing.T) {
 		"hello.tmpl":                        "Hello from hello.tmpl",        // normal template, no inheritance
 		"subdir/hello.tmpl":                 "Hello from subdir/hello.tmpl", // normal template, no inheritance
 		"child.tmpl":                        "Hello from child.tmpl",        // template with inheritance
+		"grand-child.tmpl":                  "Hello from grand-child.tmpl",  // template with inheritance
 		"master.tmpl":                       "Hello from master.tmpl",       // normal template with {{ block }}
 		"child-with-shared-components.tmpl": "Hello bar from child-with-shared-components.tmpl\n\tHello from partials/question.tmpl",
 	}
@@ -74,14 +75,16 @@ func TestTemplates(t *testing.T) {
 
 }
 
-func BenchmarkGrenderGetLayoutForFile(b *testing.B) {
+func BenchmarkExtemplateGetLayoutForTemplate(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		getLayoutForTemplate("examples/child.tmpl")
 	}
 }
 
-func BenchmarkGrenderCompileTemplatesFromDir(b *testing.B) {
-	x := New()
+func BenchmarkExtemplateParseDir(b *testing.B) {
+	x := New().Funcs(template.FuncMap{
+		"foo": strings.ToLower,
+	})
 	for i := 0; i < b.N; i++ {
 		x.ParseDir("examples/", []string{".tmpl"})
 	}

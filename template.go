@@ -122,12 +122,22 @@ func (x *Extemplate) ParseDir(root string, extensions []string) error {
 		// get template name: root/users/detail.html => users/detail.html
 		tmpl := template.Must(x.shared.Clone()).New(f.name)
 
-		// TODO: allow multi-leveled extending
+		// parse parent templates
+		templateFiles := []string{f.file}
+		parentFile := f.extends
+		for parentFile != "" {
+			path := filepath.Join(root, parentFile)
+			templateFiles = append(templateFiles, path)
+			parentFile, err = getLayoutForTemplate(path)
 
-		// parse layout file first, because we want child template to override defined templates
-		if f.extends != "" {
-			layoutFile := filepath.Join(root, f.extends)
-			b, err = ioutil.ReadFile(layoutFile)
+			if err != nil {
+				return err
+			}
+		}
+
+		// parse template files in reverse order (because childs should override parents)
+		for j := len(templateFiles) - 1; j >= 0; j-- {
+			b, err = ioutil.ReadFile(templateFiles[j])
 			if err != nil {
 				return err
 			}
@@ -135,13 +145,6 @@ func (x *Extemplate) ParseDir(root string, extensions []string) error {
 			if err != nil {
 				return err
 			}
-		}
-
-		// then, parse child-template
-		b, _ = ioutil.ReadFile(f.file)
-		_, err = tmpl.Parse(string(b))
-		if err != nil {
-			return err
 		}
 
 		// add to set under normalized name (path from root)
