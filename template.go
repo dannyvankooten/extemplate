@@ -6,6 +6,7 @@ package extemplate
 
 import (
 	"bufio"
+	"bytes"
 	"fmt"
 	"html/template"
 	"io"
@@ -26,14 +27,13 @@ type Extemplate struct {
 }
 
 type templatefile struct {
-	file    string
-	name    string
-	extends string
+	contents []byte
+	layout   string
 }
 
 func init() {
 	var err error
-	extendsRegex, err = regexp.Compile(`\{\{\/\* *?extends +?"(.+?)" *?\*\/\}\}`)
+	extendsRegex, err = regexp.Compile(`\{\{ *?extends +?"(.+?)" *?\}\}`)
 	if err != nil {
 		panic(err)
 	}
@@ -41,8 +41,9 @@ func init() {
 
 // New allocates a new, empty, template map
 func New() *Extemplate {
+	shared := template.New("")
 	return &Extemplate{
-		shared:    template.New(""),
+		shared:    shared,
 		templates: make(map[string]*template.Template),
 	}
 }
@@ -102,45 +103,51 @@ func (x *Extemplate) ParseDir(root string, extensions []string) error {
 	}
 
 	// parse all non-child templates into the shared template namespace
-	for _, f := range files {
-		if f.extends != "" {
+	for name, tf := range files {
+		if tf.layout != "" {
 			continue
 		}
-		b, err = ioutil.ReadFile(f.file)
-		if err != nil {
-			return err
-		}
 
-		_, err = x.shared.New(f.name).Parse(string(b))
+		_, err = x.shared.New(name).Parse(string(tf.contents))
 		if err != nil {
 			return err
 		}
 	}
 
 	// then, parse all templates again but with inheritance
-	for _, f := range files {
-		// get template name: root/users/detail.html => users/detail.html
-		tmpl := template.Must(x.shared.Clone()).New(f.name)
+	for name, tf := range files {
+		tmpl := template.Must(x.shared.Clone()).New(name)
 
 		// parse parent templates
-		templateFiles := []string{f.file}
-		parentFile := f.extends
-		for parentFile != "" {
-			path := filepath.Join(root, parentFile)
-			templateFiles = append(templateFiles, path)
-			parentFile, err = getLayoutForTemplate(path)
-
-			if err != nil {
-				return err
-			}
+		templateFiles := []string{name}
+		pname := tf.layout
+		parent, parentExists := files[pname]
+		for parentExists {
+			templateFiles = append(templateFiles, pname)
+			pname = parent.layout
+			parent, parentExists = files[parent.layout]
 		}
 
 		// parse template files in reverse order (because childs should override parents)
 		for j := len(templateFiles) - 1; j >= 0; j-- {
-			b, err = ioutil.ReadFile(templateFiles[j])
-			if err != nil {
-				return err
+			b = files[templateFiles[j]].contents
+
+			// strip first line of input (to get rid of our custom "extends" keyword)
+			if j < len(templateFiles)-1 {
+				for i, _ := range b {
+					// strip first line (but preserve newline)
+					if b[i] == '\n' {
+						//b = b[i:]
+						break
+					}
+
+					// for sanity, stop looking after 128 bytes
+					if i > 1024 {
+						break
+					}
+				}
 			}
+
 			_, err = tmpl.Parse(string(b))
 			if err != nil {
 				return err
@@ -148,14 +155,14 @@ func (x *Extemplate) ParseDir(root string, extensions []string) error {
 		}
 
 		// add to set under normalized name (path from root)
-		x.templates[f.name] = tmpl
+		x.templates[name] = tmpl
 	}
 
 	return nil
 }
 
-func findTemplateFiles(root string, extensions []string) ([]*templatefile, error) {
-	var files = make([]*templatefile, 0)
+func findTemplateFiles(root string, extensions []string) (map[string]*templatefile, error) {
+	var files = make(map[string]*templatefile, 0)
 	var exts = map[string]bool{}
 
 	// ensure root has trailing slash
@@ -179,12 +186,26 @@ func findTemplateFiles(root string, extensions []string) ([]*templatefile, error
 			return nil
 		}
 
-		layout, err := getLayoutForTemplate(path)
+		name := strings.TrimPrefix(path, root)
+
+		// read file into memory
+		contents, err := ioutil.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		name := strings.TrimPrefix(path, root)
-		files = append(files, &templatefile{path, name, layout})
+
+		tf := &templatefile{
+			contents: contents,
+		}
+
+		// see if this file extends another file
+		tf.layout, err = getLayoutFromTemplate(tf)
+		if err != nil {
+			return err
+		}
+
+		files[name] = tf
+
 		return nil
 	})
 
@@ -192,18 +213,18 @@ func findTemplateFiles(root string, extensions []string) ([]*templatefile, error
 }
 
 // getLayoutForTemplate scans the first line of the template file for the extends keyword
-func getLayoutForTemplate(filename string) (string, error) {
-	file, err := os.Open(filename)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
+func getLayoutFromTemplate(tf *templatefile) (string, error) {
+	r := bytes.NewReader(tf.contents)
+	scanner := bufio.NewScanner(r)
 
-	scanner := bufio.NewScanner(file)
+	// read only first line of the file content
 	scanner.Scan()
-	b := scanner.Bytes()
-	if l := extendsRegex.FindSubmatch(b); l != nil {
-		return string(l[1]), nil
+	line := scanner.Bytes()
+
+	// if we have a match, strip first line of content
+	if m := extendsRegex.FindSubmatch(line); m != nil {
+		tf.contents = tf.contents[len(line):]
+		return string(m[1]), nil
 	}
 
 	return "", nil

@@ -71,13 +71,19 @@ func TestTemplates(t *testing.T) {
 			t.Errorf("incorrect template result. \nExpected: %s\nActual: %s", v, e)
 		}
 	}
+}
 
+func TestGetLayoutForTemplate(t *testing.T) {
+	//	e := "parent.tmpl"
+	//	if l, _ := getLayoutForTemplate("examples/child.tmpl"); l != e {
+	//		t.Errorf("expected %s, got %s", e, l)
+	//	}
 }
 
 func BenchmarkExtemplateGetLayoutForTemplate(b *testing.B) {
-	for i := 0; i < b.N; i++ {
-		getLayoutForTemplate("examples/child.tmpl")
-	}
+	//for i := 0; i < b.N; i++ {
+	//	getLayoutForTemplate("examples/child.tmpl")
+	//}
 }
 
 func BenchmarkExtemplateParseDir(b *testing.B) {
