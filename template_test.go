@@ -6,6 +6,22 @@ import (
 	"testing"
 )
 
+func TestLookup(t *testing.T) {
+	x := New()
+	err := x.ParseDir("examples/", []string{".tmpl"})
+	if err != nil {
+		t.Error(err)
+	}
+
+	if tmpl := x.Lookup("foobar"); tmpl != nil {
+		t.Errorf("Lookup: expected nil, got %#v", tmpl)
+	}
+
+	if tmpl := x.Lookup("hello.tmpl"); tmpl == nil {
+		t.Error("Lookup: expected template, got nil")
+	}
+}
+
 func TestTemplate(t *testing.T) {
 	x := New()
 	err := x.ParseDir("examples/", []string{".tmpl"})
