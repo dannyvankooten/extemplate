@@ -4,13 +4,13 @@ Extemplate is a small wrapper package around [html/template](https://golang.org/
 
 File: `templates/parent.tmpl`
 ```text
-{{block "content"}}Bye{{end}} world
+{{ block "content" }}Bye{{ end }} world
 ```
 
 File: `templates/child.tmpl`
 ```text
-{{/* extends "parent.tmpl" */}}
-{{define "content"}}Hello{{end}}
+{{ extends "parent.tmpl" }}
+{{ define "content" }}Hello{{ end }}
 ```
 
 ```go
