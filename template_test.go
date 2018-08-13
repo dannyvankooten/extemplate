@@ -7,7 +7,11 @@ import (
 )
 
 func TestTemplate(t *testing.T) {
-	tmpl := ParseDir("examples/")
+	x := New()
+	err := x.ParseDir("examples/")
+	if err != nil {
+		t.Error(err)
+	}
 
 	tests := map[string]string{
 		"hello.tmpl":              "Hello from hello.tmpl",        // normal template, no inheritance
@@ -18,12 +22,13 @@ func TestTemplate(t *testing.T) {
 	}
 
 	for k, v := range tests {
-		if _, ok := tmpl[k]; !ok {
+		tmpl := x.Lookup(k)
+		if tmpl == nil {
 			t.Errorf("template not found in set: %s", k)
 		}
 
 		var buf bytes.Buffer
-		if err := tmpl[k].Execute(&buf, nil); err != nil {
+		if err := tmpl.Execute(&buf, nil); err != nil {
 			t.Errorf("error executing template %s: %s", k, err)
 		}
 
@@ -42,7 +47,8 @@ func BenchmarkGrenderGetLayoutForFile(b *testing.B) {
 }
 
 func BenchmarkGrenderCompileTemplatesFromDir(b *testing.B) {
+	x := New()
 	for i := 0; i < b.N; i++ {
-		ParseDir("examples/")
+		x.ParseDir("examples/")
 	}
 }
