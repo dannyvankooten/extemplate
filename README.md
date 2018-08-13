@@ -16,7 +16,8 @@ File: `templates/child.tmpl`
 ```go
 xt := extemplate.New()
 xt.ParseDir("templates/", []string{".tmpl"})
-_ = xt.ExecuteTemplate(os.Stdout, "child.tmpl", "no data needed")
+_ = xt.ExecuteTemplate(os.Stdout, "child.tmpl", "no data needed") 
+// Output: Hello world
 ```
 
 Extemplate recursively walks all files in the given directory and will attempt to parse those matching the given extensions as a template. Templates are named by path and basename, relative to the root directory.
