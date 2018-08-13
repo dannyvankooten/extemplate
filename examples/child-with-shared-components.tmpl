@@ -1,6 +1,6 @@
 {{/* extends "master.tmpl" */}}
 
 {{define "content" -}}
-	from child-with-partial.tmpl
+	{{foo}} from child-with-shared-components.tmpl
 	{{template "partials/question.tmpl" .}}
 {{end}}

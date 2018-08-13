@@ -155,6 +155,9 @@ func findTemplateFiles(root string, extensions []string) ([]*templatefile, error
 	var files = make([]*templatefile, 0)
 	var exts = map[string]bool{}
 
+	// ensure root has trailing slash
+	root = strings.TrimSuffix(root, "/") + "/"
+
 	// create map of allowed extensions
 	for _, e := range extensions {
 		exts[e] = true

@@ -2,16 +2,25 @@ package extemplate
 
 import (
 	"bytes"
+	"html/template"
 	"strings"
+	"sync"
 	"testing"
 )
 
-func TestLookup(t *testing.T) {
-	x := New()
+var x *Extemplate
+var once sync.Once
+
+func setup() {
+	x = New().Delims("{{", "}}").Funcs(template.FuncMap{"foo": func() string { return "bar" }})
 	err := x.ParseDir("examples/", []string{".tmpl"})
 	if err != nil {
-		t.Error(err)
+		panic(err)
 	}
+}
+
+func TestLookup(t *testing.T) {
+	once.Do(setup)
 
 	if tmpl := x.Lookup("foobar"); tmpl != nil {
 		t.Errorf("Lookup: expected nil, got %#v", tmpl)
@@ -22,19 +31,25 @@ func TestLookup(t *testing.T) {
 	}
 }
 
-func TestTemplate(t *testing.T) {
-	x := New()
-	err := x.ParseDir("examples/", []string{".tmpl"})
-	if err != nil {
+func TestExecuteTemplate(t *testing.T) {
+	once.Do(setup)
+
+	var buf bytes.Buffer
+	if err := x.ExecuteTemplate(&buf, "hello.tmpl", nil); err != nil {
 		t.Error(err)
 	}
 
+}
+
+func TestTemplates(t *testing.T) {
+	once.Do(setup)
+
 	tests := map[string]string{
-		"hello.tmpl":              "Hello from hello.tmpl",        // normal template, no inheritance
-		"subdir/hello.tmpl":       "Hello from subdir/hello.tmpl", // normal template, no inheritance
-		"child.tmpl":              "Hello from child.tmpl",        // template with inheritance
-		"master.tmpl":             "Hello from master.tmpl",       // normal template with {{ block }}
-		"child-with-partial.tmpl": "Hello from child-with-partial.tmpl\n\tHello from partials/question.tmpl",
+		"hello.tmpl":                        "Hello from hello.tmpl",        // normal template, no inheritance
+		"subdir/hello.tmpl":                 "Hello from subdir/hello.tmpl", // normal template, no inheritance
+		"child.tmpl":                        "Hello from child.tmpl",        // template with inheritance
+		"master.tmpl":                       "Hello from master.tmpl",       // normal template with {{ block }}
+		"child-with-shared-components.tmpl": "Hello bar from child-with-shared-components.tmpl\n\tHello from partials/question.tmpl",
 	}
 
 	for k, v := range tests {
