@@ -36,7 +36,10 @@ func TestExecuteTemplate(t *testing.T) {
 
 	var buf bytes.Buffer
 	if err := x.ExecuteTemplate(&buf, "hello.tmpl", nil); err != nil {
-		t.Error(err)
+		t.Errorf("ExecuteTemplate: %s", err)
+	}
+	if err := x.ExecuteTemplate(&buf, "foobar", nil); err == nil {
+		t.Error("ExecuteTemplate: expected err for unexisting template, got none")
 	}
 
 }
