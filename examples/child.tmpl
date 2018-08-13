@@ -1,3 +1,7 @@
-{{/* extends "master.tmpl" */}}
+{{/* extends "parent.tmpl" */}}
 
-{{define "content"}}from child.tmpl{{end}}
+{{define "content" -}}
+	{{tolower "FROM CHILD.TMPL"}}
+	{{template "partials/question.tmpl"}}
+{{end}}
+
