@@ -1,4 +1,4 @@
-package grender
+package extemplate
 
 import (
 	"bytes"
@@ -8,7 +8,7 @@ import (
 
 func TestTemplate(t *testing.T) {
 	x := New()
-	err := x.ParseDir("examples/")
+	err := x.ParseDir("examples/", []string{".tmpl"})
 	if err != nil {
 		t.Error(err)
 	}
@@ -49,6 +49,6 @@ func BenchmarkGrenderGetLayoutForFile(b *testing.B) {
 func BenchmarkGrenderCompileTemplatesFromDir(b *testing.B) {
 	x := New()
 	for i := 0; i < b.N; i++ {
-		x.ParseDir("examples/")
+		x.ParseDir("examples/", []string{".tmpl"})
 	}
 }

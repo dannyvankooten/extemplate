@@ -1,4 +1,8 @@
-package grender
+// Copyright 2017 Danny van Kooten. All rights reserved.
+// Use of this source code is governed by a MIT-style
+// license that can be found in the LICENSE file.
+
+package extemplate
 
 import (
 	"bufio"
@@ -14,6 +18,8 @@ import (
 
 var extendsRegex *regexp.Regexp
 
+// Extemplate holds a reference to all templates
+// and shared configuration like Delims or FuncMap
 type Extemplate struct {
 	shared    *template.Template
 	templates map[string]*template.Template
@@ -86,37 +92,16 @@ func (x *Extemplate) ExecuteTemplate(wr io.Writer, name string, data interface{}
 // Default extensions are .html and .tmpl
 // If a template file has {{/* extends "other-file.tmpl" */}} as its first line it will parse that file for base templates.
 // Parsed templates are named relative to the given root directory
-func (x *Extemplate) ParseDir(root string) error {
-	files := make([]*templatefile, 0)
+func (x *Extemplate) ParseDir(root string, extensions []string) error {
 	var b []byte
 	var err error
 
-	// find all template files
-	err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		// skip dirs as they can never be valid templates
-		if info == nil || info.IsDir() {
-			return nil
-		}
-
-		// TODO make this configurable
-		ext := filepath.Ext(path)
-		if ext != ".html" && ext != ".tmpl" {
-			return nil
-		}
-
-		layout, err := getLayoutForTemplate(path)
-		if err != nil {
-			return err
-		}
-		name := strings.TrimPrefix(path, root)
-		files = append(files, &templatefile{path, name, layout})
-		return nil
-	})
+	files, err := findTemplateFiles(root, extensions)
 	if err != nil {
 		return err
 	}
 
-	// parse all templates into a single template (without inheritance)
+	// parse all non-child templates into the shared template namespace
 	for _, f := range files {
 		if f.extends != "" {
 			continue
@@ -164,6 +149,40 @@ func (x *Extemplate) ParseDir(root string) error {
 	}
 
 	return nil
+}
+
+func findTemplateFiles(root string, extensions []string) ([]*templatefile, error) {
+	var files = make([]*templatefile, 0)
+	var exts = map[string]bool{}
+
+	// create map of allowed extensions
+	for _, e := range extensions {
+		exts[e] = true
+	}
+
+	// find all template files
+	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		// skip dirs as they can never be valid templates
+		if info == nil || info.IsDir() {
+			return nil
+		}
+
+		// skip if extension not in list of allowed extensions
+		e := filepath.Ext(path)
+		if _, ok := exts[e]; !ok {
+			return nil
+		}
+
+		layout, err := getLayoutForTemplate(path)
+		if err != nil {
+			return err
+		}
+		name := strings.TrimPrefix(path, root)
+		files = append(files, &templatefile{path, name, layout})
+		return nil
+	})
+
+	return files, err
 }
 
 // getLayoutForTemplate scans the first line of the template file for the extends keyword
