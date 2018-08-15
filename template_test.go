@@ -73,17 +73,33 @@ func TestTemplates(t *testing.T) {
 	}
 }
 
-func TestGetLayoutForTemplate(t *testing.T) {
-	//	e := "parent.tmpl"
-	//	if l, _ := getLayoutForTemplate("examples/child.tmpl"); l != e {
-	//		t.Errorf("expected %s, got %s", e, l)
-	//	}
+func TestGetLayoutFromTemplate(t *testing.T) {
+	tests := map[string]string{
+		"{{ extends \"foo.html\" }}": "foo.html",
+		"Nothing":                    "",
+		"{{ extends \"dir/file.html\" }}\n {{ .Var }}": "dir/file.html",
+	}
+
+	for c, e := range tests {
+		tf := &templatefile{
+			contents: []byte(c),
+		}
+		if l, _ := getLayoutFromTemplate(tf); l != e {
+			t.Errorf("expected %s, got %s", e, l)
+		}
+	}
+
 }
 
 func BenchmarkExtemplateGetLayoutForTemplate(b *testing.B) {
-	//for i := 0; i < b.N; i++ {
-	//	getLayoutForTemplate("examples/child.tmpl")
-	//}
+	tf := &templatefile{}
+	c := []byte("{{ extends \"foo.html\" }}")
+	for i := 0; i < b.N; i++ {
+		tf.contents = c
+		if _, err := getLayoutFromTemplate(tf); err != nil {
+			b.Error(err)
+		}
+	}
 }
 
 func BenchmarkExtemplateParseDir(b *testing.B) {

@@ -42,6 +42,16 @@ index.tmpl
 
 Check out the [tests](https://github.com/dannyvankooten/extemplate/blob/master/template_test.go) and [examples directory](https://github.com/dannyvankooten/extemplate/tree/master/examples) for more examples.
 
+### Benchmarks
+
+You will most likely never have to worry about performance, when using this package properly. 
+The benchmarks are purely listed here so we have a place to keep track of progress.
+
+```
+BenchmarkExtemplateGetLayoutForTemplate-8   	 1000000	      1536 ns/op
+BenchmarkExtemplateParseDir-8               	    5000	    237550 ns/op
+```
+
 ### License
 
 MIT
