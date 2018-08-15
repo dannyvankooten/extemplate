@@ -73,7 +73,7 @@ func TestTemplates(t *testing.T) {
 	}
 }
 
-func TestGetLayoutFromTemplate(t *testing.T) {
+func TestNewTemplateFile(t *testing.T) {
 	tests := map[string]string{
 		"{{ extends \"foo.html\" }}": "foo.html",
 		"Nothing":                    "",
@@ -81,22 +81,20 @@ func TestGetLayoutFromTemplate(t *testing.T) {
 	}
 
 	for c, e := range tests {
-		tf := &templatefile{
-			contents: []byte(c),
+		tf, err := newTemplateFile([]byte(c))
+		if err != nil {
+			t.Error(err)
 		}
-		if l, _ := getLayoutFromTemplate(tf); l != e {
-			t.Errorf("expected %s, got %s", e, l)
+		if tf.layout != e {
+			t.Errorf("Expected layout %s, got %s", e, tf.layout)
 		}
 	}
-
 }
 
 func BenchmarkExtemplateGetLayoutForTemplate(b *testing.B) {
-	tf := &templatefile{}
 	c := []byte("{{ extends \"foo.html\" }}")
 	for i := 0; i < b.N; i++ {
-		tf.contents = c
-		if _, err := getLayoutFromTemplate(tf); err != nil {
+		if _, err := newTemplateFile(c); err != nil {
 			b.Error(err)
 		}
 	}

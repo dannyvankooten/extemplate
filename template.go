@@ -131,23 +131,6 @@ func (x *Extemplate) ParseDir(root string, extensions []string) error {
 		// parse template files in reverse order (because childs should override parents)
 		for j := len(templateFiles) - 1; j >= 0; j-- {
 			b = files[templateFiles[j]].contents
-
-			// strip first line of input (to get rid of our custom "extends" keyword)
-			if j < len(templateFiles)-1 {
-				for i, _ := range b {
-					// strip first line (but preserve newline)
-					if b[i] == '\n' {
-						//b = b[i:]
-						break
-					}
-
-					// for sanity, stop looking after 128 bytes
-					if i > 1024 {
-						break
-					}
-				}
-			}
-
 			_, err = tmpl.Parse(string(b))
 			if err != nil {
 				return err
@@ -194,26 +177,24 @@ func findTemplateFiles(root string, extensions []string) (map[string]*templatefi
 			return err
 		}
 
-		tf := &templatefile{
-			contents: contents,
-		}
-
-		// see if this file extends another file
-		tf.layout, err = getLayoutFromTemplate(tf)
+		tf, err := newTemplateFile(contents)
 		if err != nil {
 			return err
 		}
 
 		files[name] = tf
-
 		return nil
 	})
 
 	return files, err
 }
 
-// getLayoutForTemplate scans the first line of the template file for the extends keyword
-func getLayoutFromTemplate(tf *templatefile) (string, error) {
+// newTemplateFile parses the file contents into something that text/template can understand
+func newTemplateFile(c []byte) (*templatefile, error) {
+	tf := &templatefile{
+		contents: c,
+	}
+
 	r := bytes.NewReader(tf.contents)
 	scanner := bufio.NewScanner(r)
 
@@ -223,9 +204,9 @@ func getLayoutFromTemplate(tf *templatefile) (string, error) {
 
 	// if we have a match, strip first line of content
 	if m := extendsRegex.FindSubmatch(line); m != nil {
-		tf.contents = tf.contents[len(line):]
-		return string(m[1]), nil
+		tf.layout = string(m[1])
+		tf.contents = c[len(line):]
 	}
 
-	return "", nil
+	return tf, nil
 }
