@@ -144,7 +144,7 @@ func (x *Extemplate) ParseDir(root string, extensions []string) error {
 }
 
 func findTemplateFiles(root string, extensions []string) (map[string]*templatefile, error) {
-	var files = make(map[string]*templatefile, 0)
+	var files = map[string]*templatefile{}
 	var exts = map[string]bool{}
 
 	// ensure root has trailing slash
