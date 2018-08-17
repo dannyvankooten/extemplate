@@ -4,23 +4,32 @@ Extemplate is a small wrapper package around [html/template](https://golang.org/
 
 File: `templates/parent.tmpl`
 ```text
-{{ block "content" }}Bye{{ end }} world
+<html>
+<head>
+	<title>{{ block "title" }}Default title{{ end }}</title>
+</head>
+<body>
+	{{ block "content" }}Default content{{ end }} 
+</body>
+</html>
 ```
 
 File: `templates/child.tmpl`
 ```text
 {{ extends "parent.tmpl" }}
-{{ define "content" }}Hello{{ end }}
+{{ define "title" }}Child title{{ end }}
+{{ define "content" }}Hello world!{{ end }}
 ```
 
+File: `main.go`
 ```go
 xt := extemplate.New()
 xt.ParseDir("templates/", []string{".tmpl"})
 _ = xt.ExecuteTemplate(os.Stdout, "child.tmpl", "no data needed") 
-// Output: Hello world
+// Output: <html>.... Hello world! ....</html>
 ```
 
-Extemplate recursively walks all files in the given directory and will attempt to parse those matching the given extensions as a template. Templates are named by path and basename, relative to the root directory.
+Extemplate recursively walks all files in the given directory and will parse the files matching the given extensions as a template. Templates are named by path and filename, relative to the root directory.
 
 For example, calling `ParseDir("templates/", []string{".tmpl"})` on the following directory structure:
 
