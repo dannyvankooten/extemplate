@@ -57,8 +57,8 @@ You will most likely never have to worry about performance, when using this pack
 The benchmarks are purely listed here so we have a place to keep track of progress.
 
 ```
-BenchmarkExtemplateGetLayoutForTemplate-8   	 1000000	      1536 ns/op
-BenchmarkExtemplateParseDir-8               	    5000	    237550 ns/op
+BenchmarkExtemplateGetLayoutForTemplate-8   	 2000000	       923 ns/op	     104 B/op	       3 allocs/op
+BenchmarkExtemplateParseDir-8               	    5000	    227898 ns/op	   34864 B/op	     325 allocs/op
 ```
 
 ### License

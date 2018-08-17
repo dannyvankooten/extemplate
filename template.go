@@ -5,7 +5,6 @@
 package extemplate
 
 import (
-	"bufio"
 	"bytes"
 	"fmt"
 	"html/template"
@@ -196,11 +195,22 @@ func newTemplateFile(c []byte) (*templatefile, error) {
 	}
 
 	r := bytes.NewReader(tf.contents)
-	scanner := bufio.NewScanner(r)
+	pos := 0
+	var line []byte
+	for {
+		ch, l, err := r.ReadRune()
+		pos += l
 
-	// read only first line of the file content
-	scanner.Scan()
-	line := scanner.Bytes()
+		// read until first line or EOF
+		if ch == '\n' || err == io.EOF {
+			line = c[0:pos]
+			break
+		}
+	}
+
+	if len(line) < 10 {
+		return tf, nil
+	}
 
 	// if we have a match, strip first line of content
 	if m := extendsRegex.FindSubmatch(line); m != nil {
