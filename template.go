@@ -115,7 +115,17 @@ func (x *Extemplate) ParseDir(root string, extensions []string) error {
 
 	// then, parse all templates again but with inheritance
 	for name, tf := range files {
+
+		// if this is a non-child template, no need to re-parse
+		if tf.layout == "" {
+			x.templates[name] = x.shared.Lookup(name)
+			continue
+		}
+
 		tmpl := template.Must(x.shared.Clone()).New(name)
+
+		// add to set under normalized name (path from root)
+		x.templates[name] = tmpl
 
 		// parse parent templates
 		templateFiles := []string{name}
@@ -136,8 +146,6 @@ func (x *Extemplate) ParseDir(root string, extensions []string) error {
 			}
 		}
 
-		// add to set under normalized name (path from root)
-		x.templates[name] = tmpl
 	}
 
 	return nil
