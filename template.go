@@ -6,6 +6,9 @@ package extemplate
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -16,13 +19,19 @@ import (
 	"strings"
 )
 
+var staticTemplates string
 var extendsRegex *regexp.Regexp
 
 // Extemplate holds a reference to all templates
 // and shared configuration like Delims or FuncMap
 type Extemplate struct {
-	shared    *template.Template
-	templates map[string]*template.Template
+	shared       *template.Template
+	sharedBackup *template.Template
+	templates    map[string]*template.Template
+	autoReload   bool
+	root         string
+	extensions   []string
+	fileTreeHash []byte
 }
 
 type templatefile struct {
@@ -78,14 +87,53 @@ func (x *Extemplate) Lookup(name string) *template.Template {
 	return nil
 }
 
+// AutoReload configures whether the templates will be automatically reloaded
+// from disk when they change. This setting has no effect when static templates
+// are compiled into the source.
+func (x *Extemplate) AutoReload(reload bool) {
+	x.autoReload = reload
+}
+
 // ExecuteTemplate applies the template named name to the specified data object and writes the output to wr.
-func (x *Extemplate) ExecuteTemplate(wr io.Writer, name string, data interface{}) error {
+// Templates will be automatically reloaded if AutoReload is true.
+// In addition to handling a single data object as is done in the standard library, this
+// wrapper also supports providing key/value pairs as individual arguments. e.g.
+//
+// tpl.ExecuteTemplate(w, "template.html", "name", "Bob", "age", 42)
+func (x *Extemplate) ExecuteTemplate(wr io.Writer, name string, data ...interface{}) error {
+	if staticTemplates == "" && x.autoReload {
+		if err := x.reloadTemplates(); err != nil {
+			return err
+		}
+	}
+
 	tmpl := x.Lookup(name)
 	if tmpl == nil {
 		return fmt.Errorf("extemplate: no template %q", name)
 	}
 
-	return tmpl.Execute(wr, data)
+	switch len(data) {
+	case 0:
+		return tmpl.Execute(wr, nil)
+	case 1:
+		return tmpl.Execute(wr, data[0])
+	}
+
+	if len(data)%2 != 0 {
+		return errors.New("odd number of key/value pairs as template data")
+	}
+
+	dataMap := make(map[string]interface{})
+
+	for i := 0; i < len(data); i += 2 {
+		key, ok := data[i].(string)
+		if !ok {
+			return errors.New("template data key must be a string")
+		}
+		dataMap[key] = data[i+1]
+	}
+
+	return tmpl.Execute(wr, dataMap)
 }
 
 // ParseDir walks the given directory root and parses all files with any of the registered extensions.
@@ -93,12 +141,62 @@ func (x *Extemplate) ExecuteTemplate(wr io.Writer, name string, data interface{}
 // If a template file has {{/* extends "other-file.tmpl" */}} as its first line it will parse that file for base templates.
 // Parsed templates are named relative to the given root directory
 func (x *Extemplate) ParseDir(root string, extensions []string) error {
+	files := make(map[string]*templatefile)
+
+	x.root = root
+
+	if len(extensions) == 0 {
+		extensions = []string{".html", ".tmpl"}
+	}
+	x.extensions = extensions
+
+	if staticTemplates != "" {
+		m := make(map[string][]byte)
+
+		err := json.Unmarshal([]byte(staticTemplates), &m)
+		if err != nil {
+			return err
+		}
+		for name, contents := range m {
+			tpl, err := newTemplateFile(contents)
+			if err != nil {
+				return err
+			}
+			files[name] = tpl
+		}
+	} else {
+		fileList, hash, err := buildFileList(root, extensions)
+		if err != nil {
+			return err
+		}
+
+		files, err = loadTemplateFiles(root, fileList)
+		if err != nil {
+			return err
+		}
+		x.fileTreeHash = hash
+	}
+
+	return x.parseTemplates(files)
+}
+
+func (x *Extemplate) ParseStatic(templates string) error {
+	var files map[string]*templatefile
+
+	if err := json.Unmarshal([]byte(templates), &files); err != nil {
+		return err
+	}
+	return x.parseTemplates(files)
+}
+
+func (x *Extemplate) parseTemplates(files map[string]*templatefile) error {
 	var b []byte
 	var err error
 
-	files, err := findTemplateFiles(root, extensions)
-	if err != nil {
-		return err
+	if x.sharedBackup == nil {
+		if x.sharedBackup, err = x.shared.Clone(); err != nil {
+			return err
+		}
 	}
 
 	// parse all non-child templates into the shared template namespace
@@ -137,7 +235,7 @@ func (x *Extemplate) ParseDir(root string, extensions []string) error {
 			parent, parentExists = files[parent.layout]
 		}
 
-		// parse template files in reverse order (because childs should override parents)
+		// parse template files in reverse order (because children should override parents)
 		for j := len(templateFiles) - 1; j >= 0; j-- {
 			b = files[templateFiles[j]].contents
 			_, err = tmpl.Parse(string(b))
@@ -151,8 +249,8 @@ func (x *Extemplate) ParseDir(root string, extensions []string) error {
 	return nil
 }
 
-func findTemplateFiles(root string, extensions []string) (map[string]*templatefile, error) {
-	var files = map[string]*templatefile{}
+func buildFileList(root string, extensions []string) ([]string, []byte, error) {
+	var files []string
 	var exts = map[string]bool{}
 
 	// ensure root has trailing slash
@@ -163,6 +261,8 @@ func findTemplateFiles(root string, extensions []string) (map[string]*templatefi
 		exts[e] = true
 	}
 
+	hash := sha256.New()
+
 	// find all template files
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		// skip dirs as they can never be valid templates
@@ -171,29 +271,78 @@ func findTemplateFiles(root string, extensions []string) (map[string]*templatefi
 		}
 
 		// skip if extension not in list of allowed extensions
-		e := filepath.Ext(path)
-		if _, ok := exts[e]; !ok {
+		if !exts[filepath.Ext(path)] {
 			return nil
 		}
 
+		// incorporate path and modification time into hash for
+		// detecting updates for auto reload
+		hash.Write([]byte(path))
+		hash.Write([]byte(info.ModTime().String()))
+
+		files = append(files, path)
+
+		return nil
+	})
+
+	if err != nil {
+		return nil, nil, err
+	}
+
+	return files, hash.Sum(nil), nil
+}
+
+func loadTemplateFiles(root string, paths []string) (map[string]*templatefile, error) {
+	// load all template files
+	var files = map[string]*templatefile{}
+
+	for _, path := range paths {
 		name := strings.TrimPrefix(path, root)
 
 		// read file into memory
 		contents, err := ioutil.ReadFile(path)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		tf, err := newTemplateFile(contents)
 		if err != nil {
-			return err
+			return nil, err
 		}
 
 		files[name] = tf
-		return nil
-	})
+	}
 
-	return files, err
+	return files, nil
+}
+
+func (x *Extemplate) reloadTemplates() error {
+	fileList, hash, err := buildFileList(x.root, x.extensions)
+	if err != nil {
+		return err
+	} else if bytes.Equal(hash, x.fileTreeHash) {
+		return nil
+	}
+
+	files, err := loadTemplateFiles(x.root, fileList)
+	if err != nil {
+		return err
+	}
+
+	x.fileTreeHash = hash
+
+	x.shared, err = x.sharedBackup.Clone()
+	if err != nil {
+		return err
+	}
+
+	x.templates = make(map[string]*template.Template)
+
+	if err := x.parseTemplates(files); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // newTemplateFile parses the file contents into something that text/template can understand
@@ -227,4 +376,8 @@ func newTemplateFile(c []byte) (*templatefile, error) {
 	}
 
 	return tf, nil
+}
+
+func StaticTemplates(s string) {
+	staticTemplates = s
 }

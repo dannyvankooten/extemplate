@@ -3,6 +3,8 @@ package extemplate
 import (
 	"bytes"
 	"html/template"
+	"io/ioutil"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -88,6 +90,89 @@ func TestNewTemplateFile(t *testing.T) {
 		if tf.layout != e {
 			t.Errorf("Expected layout %s, got %s", e, tf.layout)
 		}
+	}
+}
+
+func TestTemplateReloading(t *testing.T) {
+	x := New().Delims("{{", "}}").Funcs(template.FuncMap{
+		"tolower": strings.ToLower,
+	})
+	x.AutoReload(true)
+	if err := x.ParseDir("examples/", []string{".tmpl"}); err != nil {
+		t.Fatal(err)
+	}
+
+	// Write initial contents and verify rendering
+	if err := ioutil.WriteFile("examples/foobar.tmpl", []byte("hello"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	defer os.Remove("examples/foobar.tmpl")
+
+	var buf bytes.Buffer
+	if err := x.ExecuteTemplate(&buf, "foobar.tmpl", nil); err != nil {
+		t.Errorf("ExecuteTemplate: %s", err)
+	}
+
+	output := buf.String()
+	if output != "hello" {
+		t.Errorf(`expected "hello", got %q`, output)
+	}
+
+	// Update contents and verify rendering changes
+	if err := ioutil.WriteFile("examples/foobar.tmpl", []byte("goodbye"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	buf.Reset()
+	if err := x.ExecuteTemplate(&buf, "foobar.tmpl", nil); err != nil {
+		t.Errorf("ExecuteTemplate: %s", err)
+	}
+	output = buf.String()
+	if output != "goodbye" {
+		t.Errorf(`expected "goodbye", got %q`, output)
+	}
+
+	// Update contents again but turn off reloading. Rendering should match
+	// that in the previous step.
+	x.AutoReload(false)
+	if err := ioutil.WriteFile("examples/foobar.tmpl", []byte("ciao"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	buf.Reset()
+	if err := x.ExecuteTemplate(&buf, "foobar.tmpl", nil); err != nil {
+		t.Errorf("ExecuteTemplate: %s", err)
+	}
+	output = buf.String()
+	if output != "goodbye" {
+		t.Errorf(`expected "goodbye", got %q`, output)
+	}
+}
+
+func TestValueParameters(t *testing.T) {
+	var buf bytes.Buffer
+
+	expected := "age: 6 size: small\n"
+
+	// Verify using a standard data map
+	data := map[string]interface{}{
+		"Age":  6,
+		"Size": "small",
+	}
+	if err := x.ExecuteTemplate(&buf, "values.tmpl", data); err != nil {
+		t.Errorf("ExecuteTemplate: %s", err)
+	}
+	output := buf.String()
+	if output != expected {
+		t.Errorf(`expected %q, got %q`, expected, output)
+	}
+
+	// Verify variadic parameter style
+	buf.Reset()
+	if err := x.ExecuteTemplate(&buf, "values.tmpl", "Age", 6, "Size", "small"); err != nil {
+		t.Errorf("ExecuteTemplate: %s", err)
+	}
+	output = buf.String()
+	if output != expected {
+		t.Errorf(`expected %q, got %q`, expected, output)
 	}
 }
 

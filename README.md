@@ -9,7 +9,7 @@ File: `templates/parent.tmpl`
 	<title>{{ block "title" }}Default title{{ end }}</title>
 </head>
 <body>
-	{{ block "content" }}Default content{{ end }} 
+	{{ block "content" }}Default content{{ end }}
 </body>
 </html>
 ```
@@ -25,7 +25,7 @@ File: `main.go`
 ```go
 xt := extemplate.New()
 xt.ParseDir("templates/", []string{".tmpl"})
-_ = xt.ExecuteTemplate(os.Stdout, "child.tmpl", "no data needed") 
+_ = xt.ExecuteTemplate(os.Stdout, "child.tmpl", "no data needed")
 // Output: <html>.... Hello world! ....</html>
 ```
 
@@ -51,9 +51,35 @@ index.tmpl
 
 Check out the [tests](https://github.com/dannyvankooten/extemplate/blob/master/template_test.go) and [examples directory](https://github.com/dannyvankooten/extemplate/tree/master/examples) for more examples.
 
+### Developer Conveniences
+
+- Enable automatic template reloading with `xt.AutoReload(true)`. When enabled, the template folder will be reparsed
+on execution to allow rapid iteration of templates.
+
+- A bit of syntactic sugar was added to the standard template execution function. In addition to passing in a
+single data object (often a `map[string]interface{}`), you may also provide key/value pairs directly:
+
+```
+xt.ExecuteTemplate(os.Stdout, "child.tmpl", "foo", 42, "bar", "some value")
+```
+
+### Static Templates
+
+The contents of your template folder may be bundled into the application binary directly to allow easier
+distribution. The included `exstatic` application will create a `.go` file from the specified template folder:
+
+```
+exstatic -p my_package_name my_templates
+```
+
+When the resulting `.go` file is built with your application, the bundled template data will be used during
+`ParseDir` instead of reading the file system.
+
+See `exstatic` help for configuration options.
+
 ### Benchmarks
 
-You will most likely never have to worry about performance, when using this package properly. 
+You will most likely never have to worry about performance, when using this package properly.
 The benchmarks are purely listed here so we have a place to keep track of progress.
 
 ```
