@@ -134,7 +134,7 @@ func (x *Extemplate) ParseDir(root string, extensions []string) error {
 		for parentExists {
 			templateFiles = append(templateFiles, pname)
 			pname = parent.layout
-			parent, parentExists = files[parent.layout]
+			parent, parentExists = files[pname]
 		}
 
 		// parse template files in reverse order (because childs should override parents)
@@ -157,6 +157,9 @@ func findTemplateFiles(root string, extensions []string) (map[string]*templatefi
 
 	root = filepath.Clean(root)
 
+	// convert into os-specific seperators
+	root = filepath.FromSlash(root)
+
 	// ensure root path has trailing separator
 	root = strings.TrimSuffix(root, string(filepath.Separator)) + string(filepath.Separator)
 
@@ -177,6 +180,8 @@ func findTemplateFiles(root string, extensions []string) (map[string]*templatefi
 		if _, ok := exts[e]; !ok {
 			return nil
 		}
+
+		path = filepath.FromSlash(path)
 
 		name := strings.TrimPrefix(path, root)
 
