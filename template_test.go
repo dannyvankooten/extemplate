@@ -15,7 +15,7 @@ func setup() {
 	x = New().Delims("{{", "}}").Funcs(template.FuncMap{
 		"tolower": strings.ToLower,
 	})
-	err := x.ParseDir("examples/", []string{".tmpl"})
+	err := x.ParseDir("examples", []string{".tmpl"})
 	if err != nil {
 		panic(err)
 	}
@@ -105,6 +105,6 @@ func BenchmarkExtemplateParseDir(b *testing.B) {
 		"foo": strings.ToLower,
 	})
 	for i := 0; i < b.N; i++ {
-		x.ParseDir("examples/", []string{".tmpl"})
+		x.ParseDir("examples", []string{".tmpl"})
 	}
 }
