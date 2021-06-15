@@ -224,7 +224,7 @@ func newTemplateFile(c []byte) (*templatefile, error) {
 
 	// if we have a match, strip first line of content
 	if m := extendsRegex.FindSubmatch(line); m != nil {
-		tf.layout = string(m[1])
+		tf.layout = filepath.FromSlash(string(m[1]))
 		tf.contents = c[len(line):]
 	}
 
