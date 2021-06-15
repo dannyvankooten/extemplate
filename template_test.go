@@ -6,7 +6,6 @@ import (
 	"strings"
 	"sync"
 	"testing"
-	"path/filepath"
 )
 
 var x *Extemplate
@@ -86,7 +85,7 @@ func TestNewTemplateFile(t *testing.T) {
 		if err != nil {
 			t.Error(err)
 		}
-		if tf.layout != filepath.FromSlash(e) {
+		if tf.layout != e {
 			t.Errorf("Expected layout %s, got %s", e, tf.layout)
 		}
 	}

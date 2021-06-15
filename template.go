@@ -157,11 +157,11 @@ func findTemplateFiles(root string, extensions []string) (map[string]*templatefi
 
 	root = filepath.Clean(root)
 
-	// convert into os-specific seperators
-	root = filepath.FromSlash(root)
+	// convert os speficic path into forward slashes
+	root = filepath.ToSlash(root)
 
 	// ensure root path has trailing separator
-	root = strings.TrimSuffix(root, string(filepath.Separator)) + string(filepath.Separator)
+	root = strings.TrimSuffix(root, "/") + "/"
 
 	// create map of allowed extensions
 	for _, e := range extensions {
@@ -181,8 +181,7 @@ func findTemplateFiles(root string, extensions []string) (map[string]*templatefi
 			return nil
 		}
 
-		path = filepath.FromSlash(path)
-
+		path = filepath.ToSlash(path)
 		name := strings.TrimPrefix(path, root)
 
 		// read file into memory
@@ -229,7 +228,7 @@ func newTemplateFile(c []byte) (*templatefile, error) {
 
 	// if we have a match, strip first line of content
 	if m := extendsRegex.FindSubmatch(line); m != nil {
-		tf.layout = filepath.FromSlash(string(m[1]))
+		tf.layout = filepath.ToSlash(string(m[1]))
 		tf.contents = c[len(line):]
 	}
 
