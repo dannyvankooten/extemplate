@@ -14,6 +14,6 @@ func ExampleExtemplate_ParseDir() {
 	})
 	_ = xt.ParseDir("examples", []string{".tmpl"})
 	_ = xt.ExecuteTemplate(os.Stdout, "child.tmpl", nil)
-	// Output: Hello from child.tmpl
-	//	Hello from partials/question.tmpl
+	/* Output: Hello from child.tmpl
+	Hello from partials/question.tmpl */
 }

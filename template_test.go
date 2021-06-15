@@ -67,6 +67,7 @@ func TestTemplates(t *testing.T) {
 		}
 
 		e := strings.TrimSpace(buf.String())
+		e = strings.Replace(e, "\r\n", "\n", -1)
 		if e != v {
 			t.Errorf("incorrect template result. \nExpected: %s\nActual: %s", v, e)
 		}
