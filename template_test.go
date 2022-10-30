@@ -2,6 +2,7 @@ package extemplate
 
 import (
 	"bytes"
+	"embed"
 	"html/template"
 	"strings"
 	"sync"
@@ -9,13 +10,28 @@ import (
 )
 
 var x *Extemplate
+var xFS *Extemplate
 var once sync.Once
 
-func setup() {
-	x = New().Delims("{{", "}}").Funcs(template.FuncMap{
+//go:embed examples
+var templateFS embed.FS
+
+func newXTmpl() *Extemplate {
+	return New().Delims("{{", "}}").Funcs(template.FuncMap{
 		"tolower": strings.ToLower,
 	})
+}
+
+func setup() {
+	x = newXTmpl()
+
 	err := x.ParseDir("examples", []string{".tmpl"})
+	if err != nil {
+		panic(err)
+	}
+
+	xFS = newXTmpl()
+	err = x.ParseFS(templateFS, []string{".tmpl"})
 	if err != nil {
 		panic(err)
 	}
@@ -107,5 +123,15 @@ func BenchmarkExtemplateParseDir(b *testing.B) {
 	})
 	for i := 0; i < b.N; i++ {
 		x.ParseDir("examples", []string{".tmpl"})
+	}
+}
+
+func BenchmarkExtemplateParseFS(b *testing.B) {
+	x := New().Funcs(template.FuncMap{
+		"foo": strings.ToLower,
+	})
+
+	for i := 0; i < b.N; i++ {
+		x.ParseFS(templateFS, []string{".tmpl"})
 	}
 }

@@ -9,11 +9,10 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"io/ioutil"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 )
 
 var extendsRegex *regexp.Regexp
@@ -88,18 +87,18 @@ func (x *Extemplate) ExecuteTemplate(wr io.Writer, name string, data interface{}
 	return tmpl.Execute(wr, data)
 }
 
-// ParseDir walks the given directory root and parses all files with any of the registered extensions.
-// Default extensions are .html and .tmpl
-// If a template file has {{/* extends "other-file.tmpl" */}} as its first line it will parse that file for base templates.
-// Parsed templates are named relative to the given root directory
-func (x *Extemplate) ParseDir(root string, extensions []string) error {
-	var b []byte
-	var err error
-
-	files, err := findTemplateFiles(root, extensions)
+func (x *Extemplate) ParseFS(fs fs.FS, extensions []string) error {
+	files, err := findTemplateFiles(fs, extensions)
 	if err != nil {
 		return err
 	}
+
+	return x.parseFiles(files)
+}
+
+func (x *Extemplate) parseFiles(files map[string]*templatefile) error {
+	var b []byte
+	var err error
 
 	// parse all non-child templates into the shared template namespace
 	for name, tf := range files {
@@ -145,23 +144,23 @@ func (x *Extemplate) ParseDir(root string, extensions []string) error {
 				return err
 			}
 		}
-
 	}
 
 	return nil
 }
 
-func findTemplateFiles(root string, extensions []string) (map[string]*templatefile, error) {
+// ParseDir walks the given directory root and parses all files with any of the registered extensions.
+// Default extensions are .html and .tmpl
+// If a template file has {{/* extends "other-file.tmpl" */}} as its first line it will parse that file for base templates.
+// Parsed templates are named relative to the given root directory
+func (x *Extemplate) ParseDir(root string, extensions []string) error {
+	templatesFS := os.DirFS(root)
+	return x.ParseFS(templatesFS, extensions)
+}
+
+func findTemplateFiles(templateFs fs.FS, extensions []string) (map[string]*templatefile, error) {
 	var files = map[string]*templatefile{}
 	var exts = map[string]bool{}
-
-	root = filepath.Clean(root)
-
-	// convert os speficic path into forward slashes
-	root = filepath.ToSlash(root)
-
-	// ensure root path has trailing separator
-	root = strings.TrimSuffix(root, "/") + "/"
 
 	// create map of allowed extensions
 	for _, e := range extensions {
@@ -169,7 +168,7 @@ func findTemplateFiles(root string, extensions []string) (map[string]*templatefi
 	}
 
 	// find all template files
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+	err := fs.WalkDir(templateFs, ".", func(path string, info fs.DirEntry, err error) error {
 		// skip dirs as they can never be valid templates
 		if info == nil || info.IsDir() {
 			return nil
@@ -181,11 +180,10 @@ func findTemplateFiles(root string, extensions []string) (map[string]*templatefi
 			return nil
 		}
 
-		path = filepath.ToSlash(path)
-		name := strings.TrimPrefix(path, root)
+		name := filepath.ToSlash(path)
 
 		// read file into memory
-		contents, err := ioutil.ReadFile(path)
+		contents, err := fs.ReadFile(templateFs, path)
 		if err != nil {
 			return err
 		}
