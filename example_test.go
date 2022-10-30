@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dannyvankooten/extemplate"
+	"github.com/DHBosworth/extemplate"
 )
 
 func ExampleExtemplate_ParseDir() {

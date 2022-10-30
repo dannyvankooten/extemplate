@@ -168,7 +168,7 @@ func findTemplateFiles(templateFs fs.FS, extensions []string) (map[string]*templ
 	}
 
 	// find all template files
-	err := fs.WalkDir(templateFs, ".", func(path string, info fs.DirEntry, err error) error {
+	err := fs.WalkDir(templateFs, ".", func(path string, info fs.DirEntry, _err error) error {
 		// skip dirs as they can never be valid templates
 		if info == nil || info.IsDir() {
 			return nil
